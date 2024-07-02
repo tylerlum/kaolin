@@ -73,6 +73,10 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
               &unbatched_triangle_distance_forward_cuda);
   metrics.def("unbatched_triangle_distance_backward_cuda",
               &unbatched_triangle_distance_backward_cuda);
+  metrics.def("CUSTOM_unbatched_triangle_distance_forward_cuda",
+              &CUSTOM_unbatched_triangle_distance_forward_cuda);
+  metrics.def("CUSTOM_unbatched_triangle_distance_backward_cuda",
+              &CUSTOM_unbatched_triangle_distance_backward_cuda);
   py::module render = m.def_submodule("render");
   py::module render_mesh = render.def_submodule("mesh");
   render_mesh.def("packed_rasterize_forward_cuda", &packed_rasterize_forward_cuda);
