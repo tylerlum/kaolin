@@ -340,3 +340,85 @@ def uniform_laplacian_smoothing(vertices, faces):
     smoothed_vertices = torch.matmul(laplacian_matrix, vertices) + vertices
 
     return smoothed_vertices
+
+
+def CUSTOM_index_vertices_by_faces(vertices_features, faces):
+    r"""Index vertex features to convert per vertex tensor to per vertex per face tensor.
+
+    Args:
+        vertices_features (torch.FloatTensor):
+            vertices features, of shape
+            :math:`(\text{num_points}, \text{knum})`,
+            ``knum`` is feature dimension, the features could be xyz position,
+            rgb color, or even neural network features.
+        faces (torch.LongTensor):
+            face index, of shape :math:`(\text{num_faces}, \text{num_vertices})`.
+    Returns:
+        (torch.FloatTensor):
+            the face features, of shape
+            :math:`(\text{num_faces}, \text{num_vertices}, \text{knum})`.
+    """
+    assert vertices_features.ndim == 2, \
+        "vertices_features must have 2 dimensions of shape (num_points, knum)"
+    assert faces.ndim == 2, "faces must have 2 dimensions of shape (num_faces, num_vertices)"
+
+    num_vertices = faces.shape[-1]
+    knum = vertices_features.shape[-1]
+
+    input = vertices_features.reshape(-1, 1, 3).expand(-1, num_vertices, -1)
+    indices = faces[..., None].expand(-1, -1, knum)
+
+    face_features = torch.gather(input=input, index=indices, dim=0)
+    assert face_features.ndim == 3, \
+        "face_features must have 3 dimensions of shape (num_faces, num_vertices, knum)"
+    return face_features
+
+
+def compute_sdf(query_points, face_vertices):
+    r"""Compute the signed distance function (SDF) for a given point cloud and mesh faces.
+
+    Args:
+        query_points (torch.FloatTensor):
+            A tensor representing the query points, of shape
+            :math:`(\text{num_points}, 3)`. Each row corresponds to a point in 3D space.
+        face_vertices (torch.FloatTensor):
+            A tensor representing the vertices of the mesh faces, of shape
+            :math:`(\text{num_faces}, 3, 3)`. Each face is represented by three vertices, 
+            and each vertex is a point in 3D space.
+
+    Returns:
+        (torch.FloatTensor):
+            The computed signed distance function values, where each element represents
+            the SDF for a corresponding query point.
+    """
+    return CUSTOM_UnbatchedTriangleDistanceCuda.apply(query_points, face_vertices)
+
+
+class CUSTOM_UnbatchedTriangleDistanceCuda(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, points, face_vertices):
+        num_points = points.shape[0]
+        min_dist = torch.zeros(
+            (num_points), device=points.device, dtype=points.dtype)
+        dist_sign = torch.zeros(
+            (num_points), device=points.device, dtype=torch.int32)
+        normals = torch.zeros(
+            (num_points, 3), device=points.device, dtype=points.dtype)
+        clst_points = torch.zeros(
+            (num_points, 3), device=points.device, dtype=points.dtype)
+        _C.metrics.CUSTOM_unbatched_triangle_distance_forward_cuda(
+            points, face_vertices, min_dist, dist_sign, normals, clst_points)
+        ctx.save_for_backward(points.contiguous(), clst_points)
+        ctx.mark_non_differentiable(dist_sign, normals, clst_points)
+        return min_dist, dist_sign, normals, clst_points
+
+    @staticmethod
+    def backward(ctx, grad_dist, grad_dist_sign, grad_normals, grad_clst_points):
+        points, clst_points = ctx.saved_tensors
+        grad_dist = grad_dist.contiguous()
+        grad_points = torch.zeros_like(points)
+        grad_face_vertices = None
+        _C.metrics.CUSTOM_unbatched_triangle_distance_backward_cuda(
+            grad_dist, points, clst_points, grad_points)
+        return grad_points, grad_face_vertices
+

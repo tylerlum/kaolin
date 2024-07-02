@@ -36,6 +36,20 @@ void unbatched_triangle_distance_backward_cuda(
     at::Tensor grad_points,
     at::Tensor grad_face_vertices);
 
+void CUSTOM_unbatched_triangle_distance_forward_cuda(
+    at::Tensor points,
+    at::Tensor face_vertices,
+    at::Tensor dist,
+    at::Tensor dist_sign,
+    at::Tensor normals,
+    at::Tensor clst_points);
+
+void CUSTOM_unbatched_triangle_distance_backward_cuda(
+    at::Tensor grad_dist,
+    at::Tensor points,
+    at::Tensor clst_points,
+    at::Tensor grad_points);
+
 }  // namespace kaolin
 
 #endif // KAOLIN_METRICS_UNBATCHED_TRIANGLE_DISTANCE_H_
