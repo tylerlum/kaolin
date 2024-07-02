@@ -342,7 +342,7 @@ def uniform_laplacian_smoothing(vertices, faces):
     return smoothed_vertices
 
 
-def index_vertices_by_faces(vertices_features, faces):
+def CUSTOM_index_vertices_by_faces(vertices_features, faces):
     r"""Index vertex features to convert per vertex tensor to per vertex per face tensor.
 
     Args:
@@ -386,7 +386,7 @@ class CUSTOM_UnbatchedTriangleDistanceCuda(torch.autograd.Function):
             (num_points, 3), device=points.device, dtype=points.dtype)
         clst_points = torch.zeros(
             (num_points, 3), device=points.device, dtype=points.dtype)
-        _C.unbatched_triangle_distance_forward_cuda(
+        _C.metrics.CUSTOM_unbatched_triangle_distance_forward_cuda(
             points, face_vertices, min_dist, dist_sign, normals, clst_points)
         ctx.save_for_backward(points.contiguous(), clst_points)
         ctx.mark_non_differentiable(dist_sign, normals, clst_points)
@@ -398,7 +398,7 @@ class CUSTOM_UnbatchedTriangleDistanceCuda(torch.autograd.Function):
         grad_dist = grad_dist.contiguous()
         grad_points = torch.zeros_like(points)
         grad_face_vertices = None
-        _C.unbatched_triangle_distance_backward_cuda(
+        _C.metrics.CUSTOM_unbatched_triangle_distance_backward_cuda(
             grad_dist, points, clst_points, grad_points)
         return grad_points, grad_face_vertices
 
